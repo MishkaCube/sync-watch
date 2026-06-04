@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+rezka:
+  service:
+    enabled: true
+    path: ../rezka-service/main.py
+    python: python3
+    email: mishka.barman@gmail.com
+    password: "7649232710"
+
+spring:
+  web:
+    cors:
+      allowed-origins: "http://localhost:5173"
+  servlet:
+    multipart:
+      max-file-size: 4GB
+      max-request-size: 4GB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+logging:
+  level:
+    com.syncwatch: INFO
+    # silence the noisy broken-pipe stacktraces from aborted HLS segment requests
+    org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitterReturnValueHandler: ERROR
+    org.apache.catalina.core.ContainerBase: ERROR
+  pattern:
+    console: "%d{HH:mm:ss} %-5level %logger{0} - %msg%n"
