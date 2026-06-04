@@ -2,6 +2,9 @@ server:
   port: 8080
 
 rezka:
+  # feature flag — controls whether the HDRezka search/catalog is exposed in the UI
+  feature:
+    enabled: true
   service:
     enabled: true
     path: ../rezka-service/main.py

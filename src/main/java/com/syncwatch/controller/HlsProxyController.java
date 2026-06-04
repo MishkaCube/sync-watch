@@ -32,8 +32,7 @@ public class HlsProxyController {
      */
     @GetMapping("/manifest")
     public ResponseEntity<String> manifest(
-            @RequestParam String url,
-            @RequestHeader(value = "Host", required = false) String host
+            @RequestParam String url
     ) throws Exception {
         long start = System.currentTimeMillis();
         String content = cache.fetchText(url);
