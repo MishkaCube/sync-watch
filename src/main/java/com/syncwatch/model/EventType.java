@@ -16,6 +16,7 @@ public enum EventType {
     BUFFERING_END("buffering-end"),
     CHAT("chat"),
     SYNC("sync"),
+    READY("ready"),       // client → server: prepared to start at the barrier position
     UNKNOWN("unknown");
 
     private final String wire;

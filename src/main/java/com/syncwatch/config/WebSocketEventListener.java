@@ -1,6 +1,10 @@
 package com.syncwatch.config;
 
+import com.syncwatch.model.BufferingEvent;
+import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.ParticipantEvent;
+import com.syncwatch.service.RoomService;
+import com.syncwatch.service.RoomService.BufferingResult;
 import com.syncwatch.service.ParticipantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
@@ -15,6 +19,7 @@ import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 public class WebSocketEventListener {
 
     private final ParticipantService participantService;
+    private final RoomService roomService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @EventListener
@@ -28,7 +33,7 @@ public class WebSocketEventListener {
             String roomId = destination.substring("/topic/room.".length());
             int previous = participantService.getCount(roomId);
             int count = participantService.join(sessionId, roomId);
-            broadcast(roomId, count, previous);
+            broadcastParticipants(roomId, count, previous);
         }
     }
 
@@ -41,17 +46,24 @@ public class WebSocketEventListener {
         String roomId = participantService.getRoomId(sessionId);
         if (roomId == null) return;
 
+        // clear any buffering this client was holding (it left without buffering-end)
+        BufferingResult buf = roomService.bufferingRemove(roomId, sessionId);
+        if (buf != null) {
+            if (buf.clockChanged()) {
+                messagingTemplate.convertAndSend("/topic/room." + roomId, ClockEvent.from(buf.clock()));
+            }
+            messagingTemplate.convertAndSend("/topic/room." + roomId, new BufferingEvent(buf.count()));
+        }
+
         int previous = participantService.getCount(roomId);
         int count = participantService.leave(sessionId);
         if (count >= 0) {
-            broadcast(roomId, count, previous);
+            broadcastParticipants(roomId, count, previous);
         }
     }
 
-    private void broadcast(String roomId, int count, int previous) {
-        messagingTemplate.convertAndSend(
-                "/topic/room." + roomId,
-                new ParticipantEvent("participants-update", count, previous)
-        );
+    private void broadcastParticipants(String roomId, int count, int previous) {
+        messagingTemplate.convertAndSend("/topic/room." + roomId,
+                new ParticipantEvent("participants-update", count, previous));
     }
 }
