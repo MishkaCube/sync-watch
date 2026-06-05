@@ -1,5 +1,6 @@
 package com.syncwatch.service;
 
+import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.model.Room;
 import com.syncwatch.model.RoomClock;
@@ -41,13 +42,35 @@ public class RoomService {
 
     /** Get the room, lazily recreating it if it was lost (e.g. after a restart). */
     private Room getOrCreate(String roomId) {
-        return rooms.computeIfAbsent(roomId, id -> {
-            Room room = new Room();
-            room.setId(id);
-            room.setCreatedAt(Instant.now());
-            room.setParticipantCount(0);
-            return room;
+        Room room = rooms.computeIfAbsent(roomId, id -> {
+            Room r = new Room();
+            r.setId(id);
+            r.setCreatedAt(Instant.now());
+            r.setParticipantCount(0);
+            return r;
         });
+        room.setLastActivity(Instant.now());
+        return room;
+    }
+
+    /** Refresh a room's activity timestamp (called on every WS event). */
+    public void touch(String roomId) {
+        getOrCreate(roomId);
+    }
+
+    // ── Cleanup support ───────────────────────────────────────────────────────
+
+    public java.util.Set<String> roomIds() {
+        return new java.util.HashSet<>(rooms.keySet());
+    }
+
+    public Instant lastActivity(String roomId) {
+        Room room = rooms.get(roomId);
+        return room != null ? room.getLastActivity() : null;
+    }
+
+    public void remove(String roomId) {
+        rooms.remove(roomId);
     }
 
     public RoomClock clockPlay(String roomId, double position) {
@@ -107,7 +130,7 @@ public class RoomService {
     // ── Source tracking (for late joiners) ────────────────────────────────────
 
     public void updateLastSource(String roomId, PlayerEvent event) {
-        if ("source-change".equals(event.getType())) {
+        if (event.getType() == EventType.SOURCE_CHANGE) {
             sourceCache.put(roomId, event);
         }
     }

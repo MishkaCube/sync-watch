@@ -1,11 +1,15 @@
 package com.syncwatch.controller;
 
+import com.syncwatch.model.ChatMessage;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.Room;
+import com.syncwatch.service.ChatHistoryService;
 import com.syncwatch.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/rooms")
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class RoomController {
 
     private final RoomService roomService;
+    private final ChatHistoryService chatHistory;
 
     @PostMapping
     public ResponseEntity<Room> createRoom() {
@@ -33,5 +38,10 @@ public class RoomController {
                 .map(ClockEvent::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{id}/chat")
+    public ResponseEntity<List<ChatMessage>> getChatHistory(@PathVariable String id) {
+        return ResponseEntity.ok(chatHistory.getRecent(id));
     }
 }

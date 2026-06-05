@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Room {
     private String id;
     private Instant createdAt;
+    // refreshed on every event — used by the cleanup scheduler
+    private Instant lastActivity = Instant.now();
     private int participantCount;
     // last known player state for late joiners
     private PlayerEvent lastState;

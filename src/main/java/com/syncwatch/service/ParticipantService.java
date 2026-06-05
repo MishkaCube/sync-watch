@@ -36,4 +36,10 @@ public class ParticipantService {
         AtomicInteger count = roomCount.get(roomId);
         return count != null ? count.get() : 0;
     }
+
+    /** Drop all tracking for a room (used by the cleanup scheduler). */
+    public void removeRoom(String roomId) {
+        roomCount.remove(roomId);
+        sessionRoom.values().removeIf(roomId::equals);
+    }
 }

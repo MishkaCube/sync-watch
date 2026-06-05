@@ -1,5 +1,6 @@
 package com.syncwatch.controller;
 
+import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.service.FileStorageService;
 import com.syncwatch.service.FileStorageService.StoredFile;
@@ -35,7 +36,7 @@ public class FileController {
 
         // broadcast source-change so all clients in the room load the video
         PlayerEvent event = new PlayerEvent();
-        event.setType("source-change");
+        event.setType(EventType.SOURCE_CHANGE);
         event.setCurrentTime(0);
         event.setSenderId("server");
         event.setSourceType("url");
