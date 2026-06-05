@@ -4,6 +4,7 @@ import com.syncwatch.model.ChatMessage;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.Room;
 import com.syncwatch.service.ChatHistoryService;
+import com.syncwatch.service.ParticipantService;
 import com.syncwatch.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ public class RoomController {
 
     private final RoomService roomService;
     private final ChatHistoryService chatHistory;
+    private final ParticipantService participantService;
 
     @PostMapping
     public ResponseEntity<Room> createRoom() {
@@ -28,7 +30,11 @@ public class RoomController {
     @GetMapping("/{id}")
     public ResponseEntity<Room> getRoom(@PathVariable String id) {
         return roomService.getRoom(id)
-                .map(ResponseEntity::ok)
+                .map(room -> {
+                    // reflect the live participant count in the response
+                    room.setParticipantCount(participantService.getCount(id));
+                    return ResponseEntity.ok(room);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
