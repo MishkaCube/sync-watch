@@ -48,5 +48,17 @@ jobs:
             test -f /tmp/syncwatch-deploy/app.jar
             sudo mv /tmp/syncwatch-deploy/app.jar ${{ secrets.BACKEND_DIR }}/app.jar
             sudo systemctl restart syncwatch-backend
-            sleep 5
-            curl -fsS http://127.0.0.1:8080/api/health && echo " ✓ backend healthy"
+
+            # wait for the app to come up — Spring takes a while to bind the port
+            echo "Waiting for backend to become healthy..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+                echo " ✓ backend healthy after ${i} attempt(s)"
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo " ✗ backend did not become healthy in 60s"
+            sudo journalctl -u syncwatch-backend -n 40 --no-pager
+            exit 1
