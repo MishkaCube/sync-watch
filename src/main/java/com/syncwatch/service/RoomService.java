@@ -114,12 +114,26 @@ public class RoomService {
         return new BufferingResult(room.getClock(), room.getBufferingClients().size(), clockChanged);
     }
 
-    public BufferingResult bufferingEnd(String roomId, String senderId) {
+    public BufferingResult bufferingEnd(String roomId, String key) {
         Room room = getOrCreate(roomId);
-        room.getBufferingClients().remove(senderId);
+        room.getBufferingClients().remove(key);
         boolean clockChanged = false;
         if (room.getBufferingClients().isEmpty() && room.isPlayingBeforeBuffer()) {
             // all clients recovered — resume from frozen position
+            room.setPlayingBeforeBuffer(false);
+            room.getClock().play(room.getClock().getPosition());
+            clockChanged = true;
+        }
+        return new BufferingResult(room.getClock(), room.getBufferingClients().size(), clockChanged);
+    }
+
+    /** Clean up buffering when a client disconnects. Returns null if it wasn't buffering. */
+    public BufferingResult bufferingRemove(String roomId, String key) {
+        Room room = rooms.get(roomId);
+        if (room == null) return null;
+        if (!room.getBufferingClients().remove(key)) return null;   // wasn't buffering
+        boolean clockChanged = false;
+        if (room.getBufferingClients().isEmpty() && room.isPlayingBeforeBuffer()) {
             room.setPlayingBeforeBuffer(false);
             room.getClock().play(room.getClock().getPosition());
             clockChanged = true;

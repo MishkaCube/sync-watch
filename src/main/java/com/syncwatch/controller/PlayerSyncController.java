@@ -7,6 +7,7 @@ import com.syncwatch.model.EventType;
 import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.model.RoomClock;
 import com.syncwatch.service.ChatHistoryService;
+import com.syncwatch.service.PlaybackBarrierService;
 import com.syncwatch.service.RoomService;
 import com.syncwatch.service.RoomService.BufferingResult;
 import lombok.RequiredArgsConstructor;
@@ -27,41 +28,53 @@ public class PlayerSyncController {
     private final SimpMessagingTemplate messagingTemplate;
     private final RoomService roomService;
     private final ChatHistoryService chatHistory;
+    private final PlaybackBarrierService barrier;
 
     @MessageMapping("/room/{roomId}/event")
-    public void handleEvent(@DestinationVariable String roomId, @Payload PlayerEvent event) {
+    public void handleEvent(@DestinationVariable String roomId, @Payload PlayerEvent event,
+                            org.springframework.messaging.simp.SimpMessageHeaderAccessor headers) {
         EventType type = event.getType();
         roomService.touch(roomId);   // any event keeps the room alive
 
         switch (type) {
             case PLAY -> {
-                RoomClock clock = roomService.clockPlay(roomId, event.getCurrentTime());
-                broadcastClock(roomId, clock);
-                log.info("Room {} clock PLAY at {}s", roomId, event.getCurrentTime());
+                // synchronized start via readiness barrier (prepare → ready → go)
+                barrier.requestStart(roomId, event.getCurrentTime());
             }
             case PAUSE -> {
+                barrier.cancel(roomId);   // drop any pending start
                 RoomClock clock = roomService.clockPause(roomId, event.getCurrentTime());
                 broadcastClock(roomId, clock);
                 log.info("Room {} clock PAUSE at {}s", roomId, event.getCurrentTime());
             }
             case SEEK -> {
-                RoomClock clock = roomService.clockSeek(roomId, event.getCurrentTime());
-                broadcastClock(roomId, clock);
-                log.info("Room {} clock SEEK to {}s", roomId, event.getCurrentTime());
+                boolean wasPlaying = roomService.getClock(roomId).map(RoomClock::isPlaying).orElse(false);
+                if (wasPlaying) {
+                    // re-sync at the new position through the barrier so both resume together
+                    barrier.requestStart(roomId, event.getCurrentTime());
+                } else {
+                    RoomClock clock = roomService.clockSeek(roomId, event.getCurrentTime());
+                    broadcastClock(roomId, clock);
+                    log.info("Room {} clock SEEK to {}s", roomId, event.getCurrentTime());
+                }
             }
+            case READY -> barrier.markReady(roomId, event.getSenderId());
             case SOURCE_CHANGE -> {
                 roomService.updateLastSource(roomId, event);
                 messagingTemplate.convertAndSend("/topic/room." + roomId, event);
                 log.info("Room {} source changed", roomId);
             }
             case SOURCE_RESET -> {
+                barrier.cancel(roomId);
                 RoomClock clock = roomService.resetSource(roomId);
                 messagingTemplate.convertAndSend("/topic/room." + roomId, event);
                 if (clock != null) broadcastClock(roomId, clock);
+                broadcastBuffering(roomId, 0);   // clear any stuck buffering overlay
                 log.info("Room {} source reset", roomId);
             }
             case BUFFERING_START -> {
-                BufferingResult r = roomService.bufferingStart(roomId, event.getSenderId());
+                // key by WS session so we can clean up on disconnect
+                BufferingResult r = roomService.bufferingStart(roomId, headers.getSessionId());
                 if (r != null) {
                     if (r.clockChanged()) broadcastClock(roomId, r.clock());
                     broadcastBuffering(roomId, r.count());
@@ -69,7 +82,7 @@ public class PlayerSyncController {
                 }
             }
             case BUFFERING_END -> {
-                BufferingResult r = roomService.bufferingEnd(roomId, event.getSenderId());
+                BufferingResult r = roomService.bufferingEnd(roomId, headers.getSessionId());
                 if (r != null) {
                     if (r.clockChanged()) broadcastClock(roomId, r.clock());
                     broadcastBuffering(roomId, r.count());
