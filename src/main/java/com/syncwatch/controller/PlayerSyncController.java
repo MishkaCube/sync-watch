@@ -29,7 +29,8 @@ public class PlayerSyncController {
     private final ChatHistoryService chatHistory;
 
     @MessageMapping("/room/{roomId}/event")
-    public void handleEvent(@DestinationVariable String roomId, @Payload PlayerEvent event) {
+    public void handleEvent(@DestinationVariable String roomId, @Payload PlayerEvent event,
+                            org.springframework.messaging.simp.SimpMessageHeaderAccessor headers) {
         EventType type = event.getType();
         roomService.touch(roomId);   // any event keeps the room alive
 
@@ -82,7 +83,12 @@ public class PlayerSyncController {
                     // cap length, strip; React escapes on render so no XSS
                     String safe = text.strip();
                     if (safe.length() > 500) safe = safe.substring(0, 500);
-                    ChatMessage msg = new ChatMessage(event.getSenderId(), safe, System.currentTimeMillis());
+                    // identity is bound to the client's IP (server-authoritative, not spoofable)
+                    String ipId = headers.getSessionAttributes() != null
+                            ? (String) headers.getSessionAttributes().get("ipId")
+                            : null;
+                    String sender = ipId != null ? ipId : event.getSenderId();
+                    ChatMessage msg = new ChatMessage(sender, safe, System.currentTimeMillis());
                     chatHistory.add(roomId, msg);
                     messagingTemplate.convertAndSend("/topic/room." + roomId, msg);
                 }
