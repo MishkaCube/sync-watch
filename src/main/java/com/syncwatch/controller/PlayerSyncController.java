@@ -48,15 +48,14 @@ public class PlayerSyncController {
                 log.info("Room {} clock PAUSE at {}s", roomId, event.getCurrentTime());
             }
             case SEEK -> {
-                boolean wasPlaying = roomService.getClock(roomId).map(RoomClock::isPlaying).orElse(false);
-                if (wasPlaying) {
-                    // re-sync at the new position through the barrier so both resume together
-                    barrier.requestStart(roomId, event.getCurrentTime());
-                } else {
-                    RoomClock clock = roomService.clockSeek(roomId, event.getCurrentTime());
-                    broadcastClock(roomId, clock);
-                    log.info("Room {} clock SEEK to {}s", roomId, event.getCurrentTime());
-                }
+                // Seek is applied directly (no barrier): a pause→prepare→play cycle
+                // fights Safari's native fullscreen player and breaks seeking there.
+                // The other client catches up via drift correction; buffering
+                // coordination still kicks in if someone actually stalls.
+                barrier.cancel(roomId);
+                RoomClock clock = roomService.clockSeek(roomId, event.getCurrentTime());
+                broadcastClock(roomId, clock);
+                log.info("Room {} clock SEEK to {}s", roomId, event.getCurrentTime());
             }
             case READY -> barrier.markReady(roomId, event.getSenderId());
             case SOURCE_CHANGE -> {
