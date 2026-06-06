@@ -4,10 +4,12 @@ import com.syncwatch.model.BufferingEvent;
 import com.syncwatch.model.ChatMessage;
 import com.syncwatch.model.ClockEvent;
 import com.syncwatch.model.EventType;
+import com.syncwatch.model.LobbyEvent;
 import com.syncwatch.model.PlayerEvent;
 import com.syncwatch.model.RoomClock;
 import com.syncwatch.service.ChatHistoryService;
 import com.syncwatch.service.PlaybackBarrierService;
+import com.syncwatch.service.PresenceService;
 import com.syncwatch.service.RoomService;
 import com.syncwatch.service.RoomService.BufferingResult;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +31,7 @@ public class PlayerSyncController {
     private final RoomService roomService;
     private final ChatHistoryService chatHistory;
     private final PlaybackBarrierService barrier;
+    private final PresenceService presence;
 
     @MessageMapping("/room/{roomId}/event")
     public void handleEvent(@DestinationVariable String roomId, @Payload PlayerEvent event,
@@ -58,6 +61,10 @@ public class PlayerSyncController {
                 log.info("Room {} clock SEEK to {}s", roomId, event.getCurrentTime());
             }
             case READY -> barrier.markReady(roomId, event.getSenderId());
+            case PRESENCE -> {
+                var users = presence.update(roomId, event.getSenderId(), event.getQuality());
+                messagingTemplate.convertAndSend("/topic/room." + roomId, new LobbyEvent(users));
+            }
             case SOURCE_CHANGE -> {
                 roomService.updateLastSource(roomId, event);
                 messagingTemplate.convertAndSend("/topic/room." + roomId, event);

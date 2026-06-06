@@ -11,4 +11,6 @@ public class PlayerEvent {
     private String sourceValue;
     // for chat
     private String text;
+    // for presence
+    private String quality;  // "good" | "normal" | "weak"
 }

@@ -17,6 +17,7 @@ public enum EventType {
     CHAT("chat"),
     SYNC("sync"),
     READY("ready"),       // client → server: prepared to start at the barrier position
+    PRESENCE("presence"), // client → server: heartbeat + connection quality
     UNKNOWN("unknown");
 
     private final String wire;
