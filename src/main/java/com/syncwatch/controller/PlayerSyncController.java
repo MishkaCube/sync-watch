@@ -38,8 +38,14 @@ public class PlayerSyncController {
 
         switch (type) {
             case PLAY -> {
-                // synchronized start via readiness barrier (prepare → ready → go)
-                barrier.requestStart(roomId, event.getCurrentTime());
+                // PLAY means "resume from where the ROOM is", not from the client's
+                // local currentTime (Safari may report 0 after a reload before its
+                // native HLS seek lands). Use the server clock position as the truth.
+                double pos = roomService.getClock(roomId)
+                        .map(RoomClock::computePosition)
+                        .filter(p -> p > 0)
+                        .orElse(event.getCurrentTime());
+                barrier.requestStart(roomId, pos);
             }
             case PAUSE -> {
                 barrier.cancel(roomId);   // drop any pending start
